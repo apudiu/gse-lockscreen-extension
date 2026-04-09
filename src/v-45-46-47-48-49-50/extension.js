@@ -21,15 +21,16 @@ import Gio from 'gi://Gio';
 import Shell from 'gi://Shell';
 
 import * as Main from 'resource:///org/gnome/shell/ui/main.js';
-import {Extension, InjectionManager} from 'resource:///org/gnome/shell/extensions/extension.js';
+import { Extension, InjectionManager } from 'resource:///org/gnome/shell/extensions/extension.js';
 import LockscreenExt from './lockscreenExt.js';
 import getDesktopBackground from './utils/getDesktopBackground.js';
 
 export default class LockscreenExtension extends Extension {
-    enable() {
-        this._settings = this.getSettings();
 
-        this._systemBgSettings = new Gio.Settings({schema_id: 'org.gnome.desktop.background'});
+    enable() {
+
+        this._settings = this.getSettings();
+        this._systemBgSettings = new Gio.Settings({ schema_id: 'org.gnome.desktop.background' });
 
         // for disconnecting signals
         this._keys = this._settings.list_keys();
@@ -123,20 +124,20 @@ export default class LockscreenExtension extends Extension {
         let n = 1;
         while (nMonitors > 0) {
             switch (n) {
-            case 1:
-                this._callMonitorConnectionSettings(n);
-                break;
-            case 2:
-                this._callMonitorConnectionSettings(n);
-                break;
-            case 3:
-                this._callMonitorConnectionSettings(n);
-                break;
-            case 4:
-                this._callMonitorConnectionSettings(n);
-                break;
-            default:
-                break;
+                case 1:
+                    this._callMonitorConnectionSettings(n);
+                    break;
+                case 2:
+                    this._callMonitorConnectionSettings(n);
+                    break;
+                case 3:
+                    this._callMonitorConnectionSettings(n);
+                    break;
+                case 4:
+                    this._callMonitorConnectionSettings(n);
+                    break;
+                default:
+                    break;
             }
             n += 1;
             nMonitors -= 1;
@@ -162,6 +163,9 @@ export default class LockscreenExtension extends Extension {
             this._systemBgSettings.disconnect(this._systemBgChangedId);
             this._systemBgChangedId = null;
         }
+
+        this._settings = null;
+        this._systemBgSettings = null;
     }
 
     _onVisibilityChange() {
