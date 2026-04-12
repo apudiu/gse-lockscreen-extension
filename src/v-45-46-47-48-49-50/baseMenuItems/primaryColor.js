@@ -14,10 +14,14 @@ const primaryColor = (lockscreenExt, n) => {
         can_focus: true,
     });
 
-    inputText.clutter_text.connect('activate', actor => {
-        getInput = actor.get_text();
-        lockscreenExt._settings.set_string(`primary-color-${n}`, getInput);
-    });
+    const signals = ['activate', 'key-focus-out'];
+
+    signals.forEach(signal => {
+        inputText.clutter_text.connect(signal, actor => {
+            getInput = actor.get_text();
+            lockscreenExt._settings.set_string(`primary-color-${n}`, getInput);
+        });
+    })
 
     item.connect('notify::active', () => inputText.grab_key_focus());
     item.add_child(inputText);

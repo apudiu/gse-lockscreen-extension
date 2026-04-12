@@ -13,10 +13,14 @@ const bRadius = (lockscreenExt, n) => {
         can_focus: true,
     });
 
-    lockscreenExt._bRadiusInputText.clutter_text.connect('activate', actor => {
-        const getInput = actor.get_text();
-        lockscreenExt._settings.set_int(`blur-radius-${n}`, Number(getInput));
-    });
+    const signals = ['activate', 'key-focus-out'];
+
+    signals.forEach(signal => {
+        lockscreenExt._bRadiusInputText.clutter_text.connect(signal, actor => {
+            const getInput = actor.get_text();
+            lockscreenExt._settings.set_int(`blur-radius-${n}`, Number(getInput));
+        });
+    })
 
     item.connect('notify::active', () => lockscreenExt._bRadiusInputText.grab_key_focus());
     item.add_child(lockscreenExt._bRadiusInputText);
