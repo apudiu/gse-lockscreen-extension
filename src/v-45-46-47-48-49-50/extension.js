@@ -18,6 +18,7 @@
 
 import St from 'gi://St';
 import Gio from 'gi://Gio';
+import GLib from 'gi://GLib';
 import Shell from 'gi://Shell';
 
 import * as Main from 'resource:///org/gnome/shell/ui/main.js';
@@ -41,8 +42,16 @@ export default class LockscreenExtension extends Extension {
         //
 
         this._indicator = null;
+        this._sessionModeChangedId = null;
+        this._backgroundRefreshSourceId = null;
+        this._onSettingsChanged = this._queueBackgroundRefresh.bind(this);
 
         this._onSessionModeChanged(Main.sessionMode);
+
+        if (!this._sessionModeChangedId)
+            this._sessionModeChangedId = Main.sessionMode.connect('updated', () => {
+                this._onSessionModeChanged(Main.sessionMode);
+            });
 
         this._onVisibilityChange(); // show the extension settings icon on Admin decision
 
@@ -97,6 +106,18 @@ export default class LockscreenExtension extends Extension {
             Main.screenShield._dialog._updateBackgrounds();
     }
 
+    _queueBackgroundRefresh() {
+        if (this._backgroundRefreshSourceId)
+            GLib.Source.remove(this._backgroundRefreshSourceId);
+
+        this._backgroundRefreshSourceId = GLib.timeout_add(GLib.PRIORITY_DEFAULT, 30, () => {
+            this._backgroundRefreshSourceId = null;
+            if (Main.screenShield._dialog)
+                Main.screenShield._dialog._updateBackgrounds();
+            return GLib.SOURCE_REMOVE;
+        });
+    }
+
     _onChangesFromLockScreen() {
         if (Main.screenShield._dialog)
             Main.screenShield._dialog._updateBackgrounds();
@@ -114,39 +135,20 @@ export default class LockscreenExtension extends Extension {
             `user-background-${n}`,
         ]
             .forEach(key => {
-                this[`_${key}_changedId`] = this._settings.connect(`changed::${key}`, this._onChangesFromLockScreen.bind(this));
+                this[`_${key}_changedId`] = this._settings.connect(`changed::${key}`, this._onSettingsChanged);
             });
     }
 
     _connectionSettings() {
         let nMonitors = Main.layoutManager.monitors.length;
         nMonitors = nMonitors > 4 ? 4 : nMonitors;
-        let n = 1;
-        while (nMonitors > 0) {
-            switch (n) {
-                case 1:
-                    this._callMonitorConnectionSettings(n);
-                    break;
-                case 2:
-                    this._callMonitorConnectionSettings(n);
-                    break;
-                case 3:
-                    this._callMonitorConnectionSettings(n);
-                    break;
-                case 4:
-                    this._callMonitorConnectionSettings(n);
-                    break;
-                default:
-                    break;
-            }
-            n += 1;
-            nMonitors -= 1;
-        }
+        for (let n = 1; n <= nMonitors; n++)
+            this._callMonitorConnectionSettings(n);
 
         let key = 'hide-lockscreen-extension-button';
         this[`_${key}_changedId`] = this._settings.connect(`changed::${key}`, this._onVisibilityChange.bind(this));
         if (!this._systemBgChangedId)
-            this._systemBgChangedId = this._systemBgSettings.connect('changed::picture-uri', this._onChangesFromLockScreen.bind(this));
+            this._systemBgChangedId = this._systemBgSettings.connect('changed::picture-uri', this._onSettingsChanged);
     }
 
     _disconnectSignals() {
@@ -164,11 +166,25 @@ export default class LockscreenExtension extends Extension {
             this._systemBgChangedId = null;
         }
 
+        if (this._sessionModeChangedId) {
+            Main.sessionMode.disconnect(this._sessionModeChangedId);
+            this._sessionModeChangedId = null;
+        }
+
+        if (this._backgroundRefreshSourceId) {
+            GLib.Source.remove(this._backgroundRefreshSourceId);
+            this._backgroundRefreshSourceId = null;
+        }
+
         this._settings = null;
         this._systemBgSettings = null;
+        this._onSettingsChanged = null;
     }
 
     _onVisibilityChange() {
+        if (!this._indicator)
+            return;
+
         if (this._settings.get_boolean('hide-lockscreen-extension-button'))
             this._indicator.hide();
         else
