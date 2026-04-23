@@ -44,6 +44,7 @@ export default class LockscreenExtension extends Extension {
         this._indicator = null;
         this._sessionModeChangedId = null;
         this._backgroundRefreshSourceId = null;
+        this._backgroundOverrideInstalled = false;
         this._onSettingsChanged = this._queueBackgroundRefresh.bind(this);
 
         this._onSessionModeChanged(Main.sessionMode);
@@ -59,8 +60,18 @@ export default class LockscreenExtension extends Extension {
 
         this._injectionManager = new InjectionManager();
 
-        // override _createBackground method
-        this._injectionManager.overrideMethod(Main.screenShield._dialog, '_createBackground',
+        this._ensureBackgroundOverride();
+    }
+
+    _ensureBackgroundOverride() {
+        if (this._backgroundOverrideInstalled)
+            return;
+
+        const dialog = Main.screenShield?._dialog;
+        if (!dialog || typeof dialog._createBackground !== 'function')
+            return;
+
+        this._injectionManager.overrideMethod(dialog, '_createBackground',
             () => {
                 return monitorIndex => {
                     const n = monitorIndex + 1;
@@ -98,12 +109,12 @@ export default class LockscreenExtension extends Extension {
                         effect: new Shell.BlurEffect(blurEffect),
                     });
 
-                    Main.screenShield._dialog._backgroundGroup.add_child(widget);
+                    dialog._backgroundGroup.add_child(widget);
                 };
             });
 
-        if (Main.screenShield._dialog)
-            Main.screenShield._dialog._updateBackgrounds();
+        this._backgroundOverrideInstalled = true;
+        dialog._updateBackgrounds();
     }
 
     _queueBackgroundRefresh() {
@@ -206,10 +217,12 @@ export default class LockscreenExtension extends Extension {
     }
 
     _onSessionModeChanged(session) {
-        if (session.currentMode === 'unlock-dialog')
+        if (session.currentMode === 'unlock-dialog') {
+            this._ensureBackgroundOverride();
             this._addIndicator();
-        else if (session.currentMode === 'user' || session.parentMode === 'user')
+        } else if (session.currentMode === 'user' || session.parentMode === 'user') {
             this._removeIndicator();
+        }
     }
 
     disable() {
@@ -219,6 +232,7 @@ export default class LockscreenExtension extends Extension {
 
         this._injectionManager.clear(); // clear override method
         this._injectionManager = null;
+        this._backgroundOverrideInstalled = false;
 
         this._disconnectSignals(); // disconnect signals
 
